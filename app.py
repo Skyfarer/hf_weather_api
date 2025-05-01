@@ -6,7 +6,7 @@ app = Flask(__name__)
 app.config.from_object(Config)
 
 # Initialize Valkey client
-valkey_client = valkey.Client(
+valkey_client = valkey.client(
     host=app.config['VALKEY_HOST'],
     port=app.config['VALKEY_PORT'],
     password=app.config.get('VALKEY_PASSWORD')
