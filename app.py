@@ -250,20 +250,21 @@ def get_hfi():
         
         # Extract required parameters for HFI calculation
         try:
-            t = forecast_data.get('temperature')
-            d = forecast_data.get('dewpoint')
-            p = forecast_data.get('precipitation')
-            u = forecast_data.get('wind_u')
-            v = forecast_data.get('wind_v')
+            # Map the forecast data fields to the expected parameter names
+            t = forecast_data.get('2t')  # Temperature
+            d = forecast_data.get('2d')  # Dewpoint
+            p = forecast_data.get('tp')  # Precipitation
+            u = forecast_data.get('10u')  # Wind U component
+            v = forecast_data.get('10v')  # Wind V component
             
             # Check if all required parameters are available
             if None in (t, d, p, u, v):
                 missing_params = []
-                if t is None: missing_params.append('temperature')
-                if d is None: missing_params.append('dewpoint')
-                if p is None: missing_params.append('precipitation')
-                if u is None: missing_params.append('wind_u')
-                if v is None: missing_params.append('wind_v')
+                if t is None: missing_params.append('2t (temperature)')
+                if d is None: missing_params.append('2d (dewpoint)')
+                if p is None: missing_params.append('tp (precipitation)')
+                if u is None: missing_params.append('10u (wind u component)')
+                if v is None: missing_params.append('10v (wind v component)')
                 
                 return jsonify({
                     'error': 'Missing required parameters',
@@ -287,7 +288,14 @@ def get_hfi():
                     'dewpoint': d,
                     'precipitation': p,
                     'wind_u': u,
-                    'wind_v': v
+                    'wind_v': v,
+                    'original_fields': {
+                        '2t': t,
+                        '2d': d,
+                        'tp': p,
+                        '10u': u,
+                        '10v': v
+                    }
                 }
             })
             
