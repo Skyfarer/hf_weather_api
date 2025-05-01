@@ -2,6 +2,14 @@ from flask import Flask, request, jsonify
 import valkey
 from config import Config
 
+# Try to import the proprietary module, fall back to placeholder if not available
+try:
+    import proprietary_module
+    PROPRIETARY_MODULE_AVAILABLE = True
+except ImportError:
+    import proprietary_module_placeholder as proprietary_module
+    PROPRIETARY_MODULE_AVAILABLE = False
+
 app = Flask(__name__)
 app.config.from_object(Config)
 
@@ -209,7 +217,8 @@ def index():
     return jsonify({
         'status': 'ok',
         'message': 'Geospatial API is running',
-        'database': db_status
+        'database': db_status,
+        'proprietary_module': 'available' if PROPRIETARY_MODULE_AVAILABLE else 'using placeholder'
     })
 
 if __name__ == '__main__':
