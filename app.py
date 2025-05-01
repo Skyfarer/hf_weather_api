@@ -9,8 +9,32 @@ app.config.from_object(Config)
 valkey_client = valkey.Redis(
     host=app.config['VALKEY_HOST'],
     port=app.config['VALKEY_PORT'],
-    password=app.config.get('VALKEY_PASSWORD')
+    password=app.config.get('VALKEY_PASSWORD'),
+    socket_connect_timeout=2.0,  # Add timeout to prevent long blocking
+    decode_responses=True        # Automatically decode responses to strings
 )
+
+# Function to check database connection
+def check_database_connection():
+    """Check if the database is available"""
+    try:
+        # Check connection
+        valkey_client.ping()
+        
+        # Log the number of points in the database
+        points_count = valkey_client.zcard('points')
+        app.logger.info(f"Connected to database. Found {points_count} points in geospatial index.")
+        return True
+    except valkey.exceptions.ConnectionError as e:
+        app.logger.error(f"Failed to connect to Valkey database: {str(e)}")
+        app.logger.error(f"Make sure Valkey is running at {app.config['VALKEY_HOST']}:{app.config['VALKEY_PORT']}")
+        return False
+    except Exception as e:
+        app.logger.error(f"Error initializing sample data: {str(e)}")
+        return False
+
+# Check database connection, but continue even if it fails
+db_available = check_database_connection()
 
 @app.route('/nearby', methods=['GET'])
 def find_nearby():
@@ -28,6 +52,15 @@ def find_nearby():
     - JSON with nearby location hash keys
     """
     try:
+        # Check if database is available
+        try:
+            valkey_client.ping()
+        except valkey.exceptions.ConnectionError:
+            return jsonify({
+                'error': 'Database connection unavailable',
+                'message': 'The geospatial database is currently unavailable. Please try again later.'
+            }), 503
+            
         # Get parameters from request
         lat = request.args.get('lat')
         lon = request.args.get('lon')
@@ -54,30 +87,42 @@ def find_nearby():
             return jsonify({'error': f'Invalid unit. Must be one of: {", ".join(valid_units)}'}), 400
         
         # Execute GEORADIUS command
+        # Based on the sample output, we're just getting the geohash strings
         nearby_points = valkey_client.georadius(
             'points',
             lon,
             lat,
             radius,
             unit=unit,
-            count=count,
-            withcoord=True,
-            withdist=True,
-            withhash=True
+            count=count
         )
+        
+        # Log the search parameters and results for debugging
+        app.logger.info(f"Search params: lat={lat}, lon={lon}, radius={radius}{unit}, count={count}")
+        app.logger.info(f"Found {len(nearby_points)} points")
         
         # Format the response
         results = []
         for point in nearby_points:
-            results.append({
-                'key': point[0].decode('utf-8'),
-                'distance': point[1],
-                'coordinates': {
-                    'longitude': point[2][0],
-                    'latitude': point[2][1]
-                },
-                'hash': point[3]
-            })
+            # Handle the simple string response format
+            if isinstance(point, str):
+                results.append({'geohash': point})
+            # Handle more complex response formats if withcoord, withdist, or withhash were used
+            elif isinstance(point, list) or isinstance(point, tuple):
+                result = {'geohash': point[0]}
+                if len(point) > 1:  # Has distance
+                    result['distance'] = point[1]
+                if len(point) > 2:  # Has coordinates
+                    result['coordinates'] = {
+                        'longitude': point[2][0],
+                        'latitude': point[2][1]
+                    }
+                if len(point) > 3:  # Has hash
+                    result['hash'] = point[3]
+                results.append(result)
+            # Fallback for any other format
+            else:
+                results.append({'geohash': str(point)})
         
         return jsonify({
             'count': len(results),
@@ -88,13 +133,89 @@ def find_nearby():
         app.logger.error(f"Error processing request: {str(e)}")
         return jsonify({'error': 'Internal server error'}), 500
 
+
+@app.route('/forecast', methods=['GET'])
+def get_forecast():
+    """
+    Get weather forecast data for a specific interval and geohash.
+    
+    Query parameters:
+    - interval: Forecast interval (e.g., '0h', '1h', '2h') (required)
+    - geohash: Geohash location identifier (required)
+    
+    Returns:
+    - JSON with weather forecast data for the specified interval and location
+    """
+    try:
+        # Check if database is available
+        try:
+            valkey_client.ping()
+        except valkey.exceptions.ConnectionError:
+            return jsonify({
+                'error': 'Database connection unavailable',
+                'message': 'The forecast database is currently unavailable. Please try again later.'
+            }), 503
+            
+        # Get parameters from request
+        interval = request.args.get('interval')
+        geohash = request.args.get('geohash')
+        
+        # Validate required parameters
+        if not interval:
+            return jsonify({'error': 'Forecast interval parameter is required'}), 400
+        if not geohash:
+            return jsonify({'error': 'Geohash parameter is required'}), 400
+        
+        # Get forecast data from Valkey using the pattern {interval}:{geohash}
+        key = f"{interval}:{geohash}"
+        forecast_data = valkey_client.hgetall(key)
+        
+        # Check if data exists for the given parameters
+        if not forecast_data:
+            return jsonify({'error': f'No forecast data found for interval: {interval}, geohash: {geohash}'}), 404
+        
+        # Convert numeric values from strings to floats
+        for param in forecast_data:
+            try:
+                forecast_data[param] = float(forecast_data[param])
+            except (ValueError, TypeError):
+                # Keep as string if not convertible to float
+                pass
+        
+        # Log the request
+        app.logger.info(f"Forecast data retrieved for interval: {interval}, geohash: {geohash}")
+        
+        # Return the forecast data
+        return jsonify({
+            'interval': interval,
+            'geohash': geohash,
+            'forecast': forecast_data
+        })
+    
+    except Exception as e:
+        app.logger.error(f"Error retrieving forecast data: {str(e)}")
+        return jsonify({'error': 'Internal server error'}), 500
+
 @app.route('/', methods=['GET'])
 def index():
     """Simple index route to verify the API is running."""
+    # Check database connection
+    db_status = "connected"
+    try:
+        valkey_client.ping()
+    except Exception:
+        db_status = "disconnected"
+    
     return jsonify({
         'status': 'ok',
-        'message': 'Geospatial API is running'
+        'message': 'Geospatial API is running',
+        'database': db_status
     })
 
 if __name__ == '__main__':
+    # We already tried to connect to the database at startup
+    # If it failed, we'll retry periodically during runtime
+    if not db_available:
+        app.logger.warning("Database not available at startup. The API will continue to check for database availability.")
+    
     app.run(debug=app.config['DEBUG'], host='0.0.0.0', port=app.config['PORT'])
