@@ -36,7 +36,7 @@ def check_database_connection():
 # Check database connection, but continue even if it fails
 db_available = check_database_connection()
 
-@app.route('/wx_api/nearby', methods=['GET'])
+@app.route('/wxapi/nearby', methods=['GET'])
 def find_nearby():
     """
     Find nearby points based on latitude and longitude.
@@ -134,7 +134,7 @@ def find_nearby():
         return jsonify({'error': 'Internal server error'}), 500
 
 
-@app.route('/wx_api/forecast', methods=['GET'])
+@app.route('/wxapi/forecast', methods=['GET'])
 def get_forecast():
     """
     Get weather forecast data for a specific interval and geohash.
@@ -196,7 +196,7 @@ def get_forecast():
         app.logger.error(f"Error retrieving forecast data: {str(e)}")
         return jsonify({'error': 'Internal server error'}), 500
 
-@app.route('/wx_api/', methods=['GET'])
+@app.route('/wxapi/', methods=['GET'])
 def index():
     """Simple index route to verify the API is running."""
     # Check database connection
