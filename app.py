@@ -199,7 +199,7 @@ def get_forecast():
         return jsonify({'error': 'Internal server error'}), 500
 
 @app.route('/wxapi/hfi', methods=['GET'])
-def get_hfi():
+def calculate_hfi():
     """
     Calculate Hair Forecast Index (HFI) using forecast data.
     
@@ -271,7 +271,7 @@ def get_hfi():
                     'message': f'The following parameters are missing: {", ".join(missing_params)}'
                 }), 400
             
-            # Calculate HFI using the imported get_hfi function with positional arguments
+            # Calculate HFI using the imported get_hfi function
             hfi_result = get_hfi(t, d, p, u, v)
             
             # Log the calculation
