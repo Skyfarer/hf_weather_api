@@ -2,13 +2,8 @@ from flask import Flask, request, jsonify
 import valkey
 from config import Config
 
-# Try to import the proprietary module, fall back to placeholder if not available
-try:
-    import hf_index as proprietary_module
-    PROPRIETARY_MODULE_AVAILABLE = True
-except ImportError:
-    import proprietary_module_placeholder as proprietary_module
-    PROPRIETARY_MODULE_AVAILABLE = False
+# Import the HF index module
+import hf_index as proprietary_module
 
 app = Flask(__name__)
 app.config.from_object(Config)
@@ -218,13 +213,6 @@ def get_hfi():
     - JSON with HFI calculation result
     """
     try:
-        # Check if proprietary module is available
-        if not PROPRIETARY_MODULE_AVAILABLE:
-            return jsonify({
-                'error': 'Service unavailable',
-                'message': 'The HFI calculation service is currently unavailable.'
-            }), 503
-            
         # Get parameters from request
         interval = request.args.get('interval')
         geohash = request.args.get('geohash')
@@ -325,8 +313,7 @@ def index():
     return jsonify({
         'status': 'ok',
         'message': 'Geospatial API is running',
-        'database': db_status,
-        'proprietary_module': 'available' if PROPRIETARY_MODULE_AVAILABLE else 'using placeholder'
+        'database': db_status
     })
 
 if __name__ == '__main__':
