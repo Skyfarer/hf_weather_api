@@ -265,7 +265,7 @@ def get_hfi():
         try:
             t = forecast_data.get('temperature')
             d = forecast_data.get('dewpoint')
-            p = forecast_data.get('pressure')
+            p = forecast_data.get('precipitation')
             u = forecast_data.get('wind_u')
             v = forecast_data.get('wind_v')
             
@@ -274,7 +274,7 @@ def get_hfi():
                 missing_params = []
                 if t is None: missing_params.append('temperature')
                 if d is None: missing_params.append('dewpoint')
-                if p is None: missing_params.append('pressure')
+                if p is None: missing_params.append('precipitation')
                 if u is None: missing_params.append('wind_u')
                 if v is None: missing_params.append('wind_v')
                 
@@ -298,7 +298,7 @@ def get_hfi():
                 'input_parameters': {
                     'temperature': t,
                     'dewpoint': d,
-                    'pressure': p,
+                    'precipitation': p,
                     'wind_u': u,
                     'wind_v': v
                 }
