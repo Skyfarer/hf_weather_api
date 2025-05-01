@@ -46,8 +46,8 @@ def find_nearby():
     Query parameters:
     - lat: Latitude (required)
     - lon: Longitude (required)
-    - radius: Search radius in meters (optional, default: 1000)
-    - unit: Unit of measurement (optional, default: m - meters)
+    - radius: Search radius in kilometers (optional, default: 5)
+    - unit: Unit of measurement (optional, default: km - kilometers)
     - count: Maximum number of results (optional, default: 10)
     
     Returns:
@@ -66,8 +66,8 @@ def find_nearby():
         # Get parameters from request
         lat = request.args.get('lat')
         lon = request.args.get('lon')
-        radius = request.args.get('radius', 1000)
-        unit = request.args.get('unit', 'm')
+        radius = request.args.get('radius', 5)
+        unit = request.args.get('unit', 'km')
         count = request.args.get('count', 10)
         
         # Validate required parameters
