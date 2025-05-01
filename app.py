@@ -204,6 +204,114 @@ def get_forecast():
         app.logger.error(f"Error retrieving forecast data: {str(e)}")
         return jsonify({'error': 'Internal server error'}), 500
 
+@app.route('/wxapi/hfi', methods=['GET'])
+def get_hfi():
+    """
+    Calculate Heat Flux Index (HFI) using forecast data.
+    
+    Query parameters:
+    - interval: Forecast interval (e.g., '0h', '1h', '2h') (required)
+    - geohash: Geohash location identifier (required)
+    - unit: Temperature unit (optional, default: 'K')
+    
+    Returns:
+    - JSON with HFI calculation result
+    """
+    try:
+        # Check if proprietary module is available
+        if not PROPRIETARY_MODULE_AVAILABLE:
+            return jsonify({
+                'error': 'Service unavailable',
+                'message': 'The HFI calculation service is currently unavailable.'
+            }), 503
+            
+        # Get parameters from request
+        interval = request.args.get('interval')
+        geohash = request.args.get('geohash')
+        unit = request.args.get('unit', 'K')
+        
+        # Validate required parameters
+        if not interval:
+            return jsonify({'error': 'Forecast interval parameter is required'}), 400
+        if not geohash:
+            return jsonify({'error': 'Geohash parameter is required'}), 400
+        
+        # Check if database is available
+        try:
+            valkey_client.ping()
+        except valkey.exceptions.ConnectionError:
+            return jsonify({
+                'error': 'Database connection unavailable',
+                'message': 'The forecast database is currently unavailable. Please try again later.'
+            }), 503
+            
+        # Get forecast data from Valkey using the pattern {interval}:{geohash}
+        key = f"{interval}:{geohash}"
+        forecast_data = valkey_client.hgetall(key)
+        
+        # Check if data exists for the given parameters
+        if not forecast_data:
+            return jsonify({'error': f'No forecast data found for interval: {interval}, geohash: {geohash}'}), 404
+        
+        # Convert forecast data values from strings to floats
+        for param in forecast_data:
+            try:
+                forecast_data[param] = float(forecast_data[param])
+            except (ValueError, TypeError):
+                # Keep as string if not convertible to float
+                pass
+        
+        # Extract required parameters for HFI calculation
+        try:
+            t = forecast_data.get('temperature')
+            d = forecast_data.get('dewpoint')
+            p = forecast_data.get('pressure')
+            u = forecast_data.get('wind_u')
+            v = forecast_data.get('wind_v')
+            
+            # Check if all required parameters are available
+            if None in (t, d, p, u, v):
+                missing_params = []
+                if t is None: missing_params.append('temperature')
+                if d is None: missing_params.append('dewpoint')
+                if p is None: missing_params.append('pressure')
+                if u is None: missing_params.append('wind_u')
+                if v is None: missing_params.append('wind_v')
+                
+                return jsonify({
+                    'error': 'Missing required parameters',
+                    'message': f'The following parameters are missing: {", ".join(missing_params)}'
+                }), 400
+            
+            # Calculate HFI using the proprietary module
+            hfi_result = proprietary_module.get_hfi(t, d, p, u, v, unit=unit)
+            
+            # Log the calculation
+            app.logger.info(f"HFI calculated for interval: {interval}, geohash: {geohash}, result: {hfi_result}")
+            
+            # Return the HFI result
+            return jsonify({
+                'interval': interval,
+                'geohash': geohash,
+                'hfi': hfi_result,
+                'unit': unit,
+                'input_parameters': {
+                    'temperature': t,
+                    'dewpoint': d,
+                    'pressure': p,
+                    'wind_u': u,
+                    'wind_v': v
+                }
+            })
+            
+        except Exception as e:
+            app.logger.error(f"Error calculating HFI: {str(e)}")
+            return jsonify({'error': 'Error calculating HFI', 'message': str(e)}), 500
+    
+    except Exception as e:
+        app.logger.error(f"Error processing HFI request: {str(e)}")
+        return jsonify({'error': 'Internal server error'}), 500
+
 @app.route('/wxapi/', methods=['GET'])
 def index():
     """Simple index route to verify the API is running."""
