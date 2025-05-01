@@ -1,6 +1,7 @@
 from flask import Flask, request, jsonify
 import valkey
 from config import Config
+from database import check_database_connection
 
 app = Flask(__name__)
 app.config.from_object(Config)
@@ -14,27 +15,8 @@ valkey_client = valkey.Redis(
     decode_responses=True        # Automatically decode responses to strings
 )
 
-# Function to check database connection
-def check_database_connection():
-    """Check if the database is available"""
-    try:
-        # Check connection
-        valkey_client.ping()
-        
-        # Log the number of points in the database
-        points_count = valkey_client.zcard('points')
-        app.logger.info(f"Connected to database. Found {points_count} points in geospatial index.")
-        return True
-    except valkey.exceptions.ConnectionError as e:
-        app.logger.error(f"Failed to connect to Valkey database: {str(e)}")
-        app.logger.error(f"Make sure Valkey is running at {app.config['VALKEY_HOST']}:{app.config['VALKEY_PORT']}")
-        return False
-    except Exception as e:
-        app.logger.error(f"Error initializing sample data: {str(e)}")
-        return False
-
 # Check database connection, but continue even if it fails
-db_available = check_database_connection()
+db_available = check_database_connection(valkey_client)
 
 @app.route('/wxapi/nearby', methods=['GET'])
 def find_nearby():
