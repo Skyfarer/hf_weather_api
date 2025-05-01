@@ -272,7 +272,7 @@ def get_hfi():
                 }), 400
             
             # Calculate HFI using the imported get_hfi function with unit set to "K"
-            hfi_result = get_hfi(t, d, p, u, v, unit="K")
+            hfi_result = get_hfi(t, d, p, u, v)
             
             # Log the calculation
             app.logger.info(f"Hair Forecast Index calculated for interval: {interval}, geohash: {geohash}, result: {hfi_result}")
