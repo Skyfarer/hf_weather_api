@@ -271,8 +271,8 @@ def get_hfi():
                     'message': f'The following parameters are missing: {", ".join(missing_params)}'
                 }), 400
             
-            # Calculate HFI using the imported get_hfi function
-            hfi_result = get_hfi(t=t, d=d, p=p, u=u, v=v, unit=unit)
+            # Calculate HFI using the imported get_hfi function with default unit
+            hfi_result = get_hfi(t=t, d=d, p=p, u=u, v=v)
             
             # Log the calculation
             app.logger.info(f"Hair Forecast Index calculated for interval: {interval}, geohash: {geohash}, result: {hfi_result}")
