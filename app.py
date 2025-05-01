@@ -277,26 +277,20 @@ def calculate_hfi():
             # Log the calculation
             app.logger.info(f"Hair Forecast Index calculated for interval: {interval}, geohash: {geohash}, result: {hfi_result}")
             
-            # Return the HFI result
+            # Convert temperature and dewpoint from K to F
+            temp_f = (t - 273.15) * 9/5 + 32
+            dewpoint_f = (d - 273.15) * 9/5 + 32
+            
+            # Calculate wind speed in mph from U and V components
+            # Convert from m/s to mph (1 m/s = 2.23694 mph)
+            wind_speed_mph = ((u**2 + v**2)**0.5) * 2.23694
+            
+            # Return the simplified HFI result
             return jsonify({
-                'interval': interval,
-                'geohash': geohash,
                 'hfi': hfi_result,
-                'unit': unit,
-                'input_parameters': {
-                    'temperature': t,
-                    'dewpoint': d,
-                    'precipitation': p,
-                    'wind_u': u,
-                    'wind_v': v,
-                    'original_fields': {
-                        '2t': t,
-                        '2d': d,
-                        'tp': p,
-                        '10u': u,
-                        '10v': v
-                    }
-                }
+                'temperature_f': round(temp_f, 1),
+                'dewpoint_f': round(dewpoint_f, 1),
+                'wind_mph': round(wind_speed_mph, 1)
             })
             
         except Exception as e:
