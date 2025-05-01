@@ -2,8 +2,7 @@ from flask import Flask, request, jsonify
 import valkey
 from config import Config
 
-# Import the HF index module
-import hf_index as proprietary_module
+from hf_index.core import get_hfi
 
 app = Flask(__name__)
 app.config.from_object(Config)
