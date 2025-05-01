@@ -4,7 +4,7 @@ from config import Config
 
 # Try to import the proprietary module, fall back to placeholder if not available
 try:
-    import proprietary_module
+    import hf_index as proprietary_module
     PROPRIETARY_MODULE_AVAILABLE = True
 except ImportError:
     import proprietary_module_placeholder as proprietary_module
