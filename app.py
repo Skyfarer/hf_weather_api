@@ -207,7 +207,7 @@ def get_forecast():
 @app.route('/wxapi/hfi', methods=['GET'])
 def get_hfi():
     """
-    Calculate Heat Flux Index (HFI) using forecast data.
+    Calculate Hair Forecast Index (HFI) using forecast data.
     
     Query parameters:
     - interval: Forecast interval (e.g., '0h', '1h', '2h') (required)
@@ -287,7 +287,7 @@ def get_hfi():
             hfi_result = proprietary_module.get_hfi(t, d, p, u, v, unit=unit)
             
             # Log the calculation
-            app.logger.info(f"HFI calculated for interval: {interval}, geohash: {geohash}, result: {hfi_result}")
+            app.logger.info(f"Hair Forecast Index calculated for interval: {interval}, geohash: {geohash}, result: {hfi_result}")
             
             # Return the HFI result
             return jsonify({
@@ -305,11 +305,11 @@ def get_hfi():
             })
             
         except Exception as e:
-            app.logger.error(f"Error calculating HFI: {str(e)}")
-            return jsonify({'error': 'Error calculating HFI', 'message': str(e)}), 500
+            app.logger.error(f"Error calculating Hair Forecast Index: {str(e)}")
+            return jsonify({'error': 'Error calculating Hair Forecast Index', 'message': str(e)}), 500
     
     except Exception as e:
-        app.logger.error(f"Error processing HFI request: {str(e)}")
+        app.logger.error(f"Error processing Hair Forecast Index request: {str(e)}")
         return jsonify({'error': 'Internal server error'}), 500
 
 @app.route('/wxapi/', methods=['GET'])
