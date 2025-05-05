@@ -229,8 +229,8 @@ def calculate_hfi():
                 'message': 'The forecast database is currently unavailable. Please try again later.'
             }), 503
         
-        # Define the intervals we want to fetch
-        intervals = ['0h', '6h', '12h', '24h', '36h', '48h', '72h', '96h']
+        # Define the intervals we want to fetch - every 6 hours for 48 hours (8 intervals)
+        intervals = ['0h', '6h', '12h', '18h', '24h', '30h', '36h', '42h', '48h']
         
         # Store results for each interval
         results = []
