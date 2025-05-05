@@ -1,6 +1,7 @@
 from flask import Flask, request, jsonify
 import valkey
 from config import Config
+import datetime
 
 from hf_index.core import get_hfi
 
@@ -202,14 +203,14 @@ def get_forecast():
 @app.route('/wxapi/hfi', methods=['GET'])
 def calculate_hfi():
     """
-    Calculate Hair Forecast Index (HFI) using forecast data for the next 8 intervals.
+    Calculate Hair Forecast Index (HFI) using forecast data for 8 intervals.
     
     Query parameters:
     - geohash: Geohash location identifier (required)
     - unit: Temperature unit (optional, default: 'K')
     
     Returns:
-    - JSON with HFI calculation results for intervals: 0h, 6h, 12h, 24h, 36h, 48h, 72h, 96h
+    - JSON with HFI calculation results for 8 intervals starting from the nearest 6-hour mark
     """
     try:
         # Get parameters from request
@@ -229,8 +230,31 @@ def calculate_hfi():
                 'message': 'The forecast database is currently unavailable. Please try again later.'
             }), 503
         
-        # Define the intervals we want to fetch - every 6 hours for 48 hours (8 intervals)
-        intervals = ['0h', '6h', '12h', '18h', '24h', '30h', '36h', '42h']
+        # Calculate intervals based on current time
+        # Get current UTC time
+        now = datetime.datetime.utcnow()
+        
+        # Find the most recent 00Z, 06Z, 12Z, or 18Z time
+        current_hour = now.hour
+        base_hour = (current_hour // 6) * 6  # This gives 0, 6, 12, or 18
+        
+        # Create a datetime for the base time
+        base_time = now.replace(hour=base_hour, minute=0, second=0, microsecond=0)
+        
+        # If we're past the base time, use it as our reference
+        # Otherwise, go back to the previous 6-hour mark
+        if now < base_time:
+            base_time = base_time - datetime.timedelta(hours=6)
+        
+        # Generate 8 intervals, each 6 hours apart, starting from the base time
+        intervals = []
+        for i in range(8):
+            # Calculate hours from base time
+            hours_from_base = i * 6
+            interval_str = f"{hours_from_base}h"
+            intervals.append(interval_str)
+        
+        app.logger.info(f"Using intervals: {intervals} based on current UTC time: {now}")
         
         # Store results for each interval
         results = []
