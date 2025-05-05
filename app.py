@@ -230,7 +230,7 @@ def calculate_hfi():
             }), 503
         
         # Define the intervals we want to fetch - every 6 hours for 48 hours (8 intervals)
-        intervals = ['0h', '6h', '12h', '18h', '24h', '30h', '36h', '42h', '48h']
+        intervals = ['0h', '6h', '12h', '18h', '24h', '30h', '36h', '42h']
         
         # Store results for each interval
         results = []
