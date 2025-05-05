@@ -202,25 +202,21 @@ def get_forecast():
 @app.route('/wxapi/hfi', methods=['GET'])
 def calculate_hfi():
     """
-    Calculate Hair Forecast Index (HFI) using forecast data.
+    Calculate Hair Forecast Index (HFI) using forecast data for the next 8 intervals.
     
     Query parameters:
-    - interval: Forecast interval (e.g., '0h', '1h', '2h') (required)
     - geohash: Geohash location identifier (required)
     - unit: Temperature unit (optional, default: 'K')
     
     Returns:
-    - JSON with HFI calculation result
+    - JSON with HFI calculation results for intervals: 0h, 6h, 12h, 24h, 36h, 48h, 72h, 96h
     """
     try:
         # Get parameters from request
-        interval = request.args.get('interval')
         geohash = request.args.get('geohash')
         unit = request.args.get('unit', 'K')
         
         # Validate required parameters
-        if not interval:
-            return jsonify({'error': 'Forecast interval parameter is required'}), 400
         if not geohash:
             return jsonify({'error': 'Geohash parameter is required'}), 400
         
@@ -232,71 +228,98 @@ def calculate_hfi():
                 'error': 'Database connection unavailable',
                 'message': 'The forecast database is currently unavailable. Please try again later.'
             }), 503
+        
+        # Define the intervals we want to fetch
+        intervals = ['0h', '6h', '12h', '24h', '36h', '48h', '72h', '96h']
+        
+        # Store results for each interval
+        results = []
+        
+        # Process each interval
+        for interval in intervals:
+            # Get forecast data from Valkey using the pattern {interval}:{geohash}
+            key = f"{interval}:{geohash}"
+            forecast_data = valkey_client.hgetall(key)
             
-        # Get forecast data from Valkey using the pattern {interval}:{geohash}
-        key = f"{interval}:{geohash}"
-        forecast_data = valkey_client.hgetall(key)
-        
-        # Check if data exists for the given parameters
-        if not forecast_data:
-            return jsonify({'error': f'No forecast data found for interval: {interval}, geohash: {geohash}'}), 404
-        
-        # Convert forecast data values from strings to floats
-        for param in forecast_data:
+            # Skip if no data for this interval
+            if not forecast_data:
+                results.append({
+                    'interval': interval,
+                    'available': False,
+                    'message': f'No forecast data found for interval: {interval}'
+                })
+                continue
+            
+            # Convert forecast data values from strings to floats
+            for param in forecast_data:
+                try:
+                    forecast_data[param] = float(forecast_data[param])
+                except (ValueError, TypeError):
+                    # Keep as string if not convertible to float
+                    pass
+            
+            # Extract required parameters for HFI calculation
             try:
-                forecast_data[param] = float(forecast_data[param])
-            except (ValueError, TypeError):
-                # Keep as string if not convertible to float
-                pass
-        
-        # Extract required parameters for HFI calculation
-        try:
-            # Map the forecast data fields to the expected parameter names
-            t = forecast_data.get('2t')  # Temperature
-            d = forecast_data.get('2d')  # Dewpoint
-            p = forecast_data.get('tp')  # Precipitation
-            u = forecast_data.get('10u')  # Wind U component
-            v = forecast_data.get('10v')  # Wind V component
-            
-            # Check if all required parameters are available
-            if None in (t, d, p, u, v):
-                missing_params = []
-                if t is None: missing_params.append('2t (temperature)')
-                if d is None: missing_params.append('2d (dewpoint)')
-                if p is None: missing_params.append('tp (precipitation)')
-                if u is None: missing_params.append('10u (wind u component)')
-                if v is None: missing_params.append('10v (wind v component)')
+                # Map the forecast data fields to the expected parameter names
+                t = forecast_data.get('2t')  # Temperature
+                d = forecast_data.get('2d')  # Dewpoint
+                p = forecast_data.get('tp')  # Precipitation
+                u = forecast_data.get('10u')  # Wind U component
+                v = forecast_data.get('10v')  # Wind V component
                 
-                return jsonify({
-                    'error': 'Missing required parameters',
-                    'message': f'The following parameters are missing: {", ".join(missing_params)}'
-                }), 400
-            
-            # Calculate HFI using the imported get_hfi function
-            hfi_result = get_hfi(t, d, p, u, v)
-            
-            # Log the calculation
-            app.logger.info(f"Hair Forecast Index calculated for interval: {interval}, geohash: {geohash}, result: {hfi_result}")
-            
-            # Convert temperature and dewpoint from K to F
-            temp_f = (t - 273.15) * 9/5 + 32
-            dewpoint_f = (d - 273.15) * 9/5 + 32
-            
-            # Calculate wind speed in mph from U and V components
-            # Convert from m/s to mph (1 m/s = 2.23694 mph)
-            wind_speed_mph = ((u**2 + v**2)**0.5) * 2.23694
-            
-            # Return the simplified HFI result
-            return jsonify({
-                'hfi': hfi_result,
-                'temperature_f': round(temp_f, 1),
-                'dewpoint_f': round(dewpoint_f, 1),
-                'wind_mph': round(wind_speed_mph, 1)
-            })
-            
-        except Exception as e:
-            app.logger.error(f"Error calculating Hair Forecast Index: {str(e)}")
-            return jsonify({'error': 'Error calculating Hair Forecast Index', 'message': str(e)}), 500
+                # Check if all required parameters are available
+                if None in (t, d, p, u, v):
+                    missing_params = []
+                    if t is None: missing_params.append('2t (temperature)')
+                    if d is None: missing_params.append('2d (dewpoint)')
+                    if p is None: missing_params.append('tp (precipitation)')
+                    if u is None: missing_params.append('10u (wind u component)')
+                    if v is None: missing_params.append('10v (wind v component)')
+                    
+                    results.append({
+                        'interval': interval,
+                        'available': False,
+                        'message': f'Missing parameters: {", ".join(missing_params)}'
+                    })
+                    continue
+                
+                # Calculate HFI using the imported get_hfi function
+                hfi_result = get_hfi(t, d, p, u, v)
+                
+                # Log the calculation
+                app.logger.info(f"Hair Forecast Index calculated for interval: {interval}, geohash: {geohash}, result: {hfi_result}")
+                
+                # Convert temperature and dewpoint from K to F
+                temp_f = (t - 273.15) * 9/5 + 32
+                dewpoint_f = (d - 273.15) * 9/5 + 32
+                
+                # Calculate wind speed in mph from U and V components
+                # Convert from m/s to mph (1 m/s = 2.23694 mph)
+                wind_speed_mph = ((u**2 + v**2)**0.5) * 2.23694
+                
+                # Add the result for this interval
+                results.append({
+                    'interval': interval,
+                    'available': True,
+                    'hfi': hfi_result,
+                    'temperature_f': round(temp_f, 1),
+                    'dewpoint_f': round(dewpoint_f, 1),
+                    'wind_mph': round(wind_speed_mph, 1)
+                })
+                
+            except Exception as e:
+                app.logger.error(f"Error calculating Hair Forecast Index for interval {interval}: {str(e)}")
+                results.append({
+                    'interval': interval,
+                    'available': False,
+                    'message': f'Error calculating HFI: {str(e)}'
+                })
+        
+        # Return all interval results
+        return jsonify({
+            'geohash': geohash,
+            'intervals': results
+        })
     
     except Exception as e:
         app.logger.error(f"Error processing Hair Forecast Index request: {str(e)}")
