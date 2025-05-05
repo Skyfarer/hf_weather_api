@@ -234,37 +234,29 @@ def calculate_hfi():
         # Get current UTC time
         now = datetime.datetime.utcnow()
         
-        # For this application, we assume model runs are at 00Z, 06Z, 12Z, and 18Z
-        # Find the most recent model run time
-        current_hour = now.hour
-        base_hour = (current_hour // 6) * 6  # This gives 0, 6, 12, or 18
+        # For this application, we assume the model run is at 00Z
+        # and outputs forecasts valid every 6 hours (00Z, 06Z, 12Z, 18Z)
         
-        # Create a datetime for the base model run time
-        base_time = now.replace(hour=base_hour, minute=0, second=0, microsecond=0)
+        # Calculate hours since 00Z today
+        hours_since_00z = now.hour + (now.minute / 60.0)
         
-        # If we're past the base time, use it as our reference
-        # Otherwise, go back to the previous 6-hour mark
-        if now < base_time:
-            base_time = base_time - datetime.timedelta(hours=6)
+        # Calculate the first forecast hour we need
+        # We want to start with the next 6-hour mark after the current time
+        # Round up to the next 6-hour mark
+        first_forecast_hour = int((hours_since_00z + 5.99) // 6) * 6
         
-        # Calculate hours since the most recent model run
-        hours_since_model_run = (now - base_time).total_seconds() / 3600
+        # If we're past 18Z, we need to use the next day's forecasts
+        if first_forecast_hour >= 24:
+            first_forecast_hour = 24  # Start with 24h forecast
         
-        # For late hours (approaching the next model run), we want to start with a higher interval
-        # If we're more than 4 hours past the model run, start with the next 6-hour mark
-        if hours_since_model_run > 4:
-            first_interval = 6
-        else:
-            first_interval = 0
-        
-        # Generate 8 intervals, each 6 hours apart, starting from the first interval
+        # Generate 8 intervals, each 6 hours apart, starting from the first forecast hour
         intervals = []
         for i in range(8):
-            interval_hours = first_interval + (i * 6)
+            interval_hours = first_forecast_hour + (i * 6)
             interval_str = f"{interval_hours}h"
             intervals.append(interval_str)
         
-        app.logger.info(f"Using intervals: {intervals} based on current UTC time: {now}, hours since model run: {hours_since_model_run}, first interval: {first_interval}h")
+        app.logger.info(f"Using intervals: {intervals} based on current UTC time: {now}, hours since 00Z: {hours_since_00z}, first forecast hour: {first_forecast_hour}h")
         
         # Store results for each interval
         results = []
