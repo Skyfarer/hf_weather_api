@@ -234,11 +234,11 @@ def calculate_hfi():
         # Get current UTC time
         now = datetime.datetime.utcnow()
         
-        # Find the most recent 00Z, 06Z, 12Z, or 18Z time
+        # Find the most recent model run time (00Z, 06Z, 12Z, or 18Z)
         current_hour = now.hour
         base_hour = (current_hour // 6) * 6  # This gives 0, 6, 12, or 18
         
-        # Create a datetime for the base time
+        # Create a datetime for the base model run time
         base_time = now.replace(hour=base_hour, minute=0, second=0, microsecond=0)
         
         # If we're past the base time, use it as our reference
@@ -246,15 +246,20 @@ def calculate_hfi():
         if now < base_time:
             base_time = base_time - datetime.timedelta(hours=6)
         
-        # Generate 8 intervals, each 6 hours apart, starting from the base time
+        # Calculate hours since the most recent model run
+        hours_since_model_run = (now - base_time).total_seconds() / 3600
+        
+        # Round to the nearest 6-hour mark for the first forecast interval
+        first_interval = int(((hours_since_model_run + 3) // 6) * 6)  # +3 to round to nearest 6
+        
+        # Generate 8 intervals, each 6 hours apart, starting from the first interval
         intervals = []
         for i in range(8):
-            # Calculate hours from base time
-            hours_from_base = i * 6
-            interval_str = f"{hours_from_base}h"
+            interval_hours = first_interval + (i * 6)
+            interval_str = f"{interval_hours}h"
             intervals.append(interval_str)
         
-        app.logger.info(f"Using intervals: {intervals} based on current UTC time: {now}")
+        app.logger.info(f"Using intervals: {intervals} based on current UTC time: {now}, hours since model run: {hours_since_model_run}")
         
         # Store results for each interval
         results = []
