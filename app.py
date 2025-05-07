@@ -351,6 +351,123 @@ def calculate_hfi():
         app.logger.error(f"Error processing Hair Forecast Index request: {str(e)}")
         return jsonify({'error': 'Internal server error'}), 500
 
+@app.route('/wxapi/hfi-summary', methods=['GET'])
+def hfi_summary():
+    """
+    Calculate summary Hair Forecast Index (HFI) data across all intervals.
+    
+    Query parameters:
+    - geohash: Geohash location identifier (required)
+    
+    Returns:
+    - JSON with summary HFI data including high temperature, average wind, and average HFI
+    """
+    try:
+        # Get parameters from request
+        geohash = request.args.get('geohash')
+        
+        # Validate required parameters
+        if not geohash:
+            return jsonify({'error': 'Geohash parameter is required'}), 400
+        
+        # Check if database is available
+        try:
+            valkey_client.ping()
+        except valkey.exceptions.ConnectionError:
+            return jsonify({
+                'error': 'Database connection unavailable',
+                'message': 'The forecast database is currently unavailable. Please try again later.'
+            }), 503
+        
+        # Calculate intervals based on current time
+        now = datetime.datetime.utcnow()
+        hours_since_00z = now.hour + (now.minute / 60.0)
+        first_forecast_hour = int((hours_since_00z + 5.99) // 6) * 6
+        
+        if first_forecast_hour >= 24:
+            first_forecast_hour = 24
+        
+        # Generate 8 intervals, each 6 hours apart
+        intervals = []
+        for i in range(8):
+            interval_hours = first_forecast_hour + (i * 6)
+            interval_str = f"{interval_hours}h"
+            intervals.append(interval_str)
+        
+        app.logger.info(f"Using intervals: {intervals} for summary calculation")
+        
+        # Variables to track summary data
+        high_temp_f = float('-inf')
+        total_wind_mph = 0
+        total_hfi = 0
+        valid_intervals = 0
+        
+        # Process each interval
+        for interval in intervals:
+            key = f"{interval}:{geohash}"
+            forecast_data = valkey_client.hgetall(key)
+            
+            # Skip if no data for this interval
+            if not forecast_data:
+                continue
+            
+            # Convert forecast data values from strings to floats
+            for param in forecast_data:
+                try:
+                    forecast_data[param] = float(forecast_data[param])
+                except (ValueError, TypeError):
+                    pass
+            
+            # Extract required parameters
+            t = forecast_data.get('2t')  # Temperature
+            d = forecast_data.get('2d')  # Dewpoint
+            p = forecast_data.get('tp')  # Precipitation
+            u = forecast_data.get('10u')  # Wind U component
+            v = forecast_data.get('10v')  # Wind V component
+            
+            # Skip if missing any required parameters
+            if None in (t, d, p, u, v):
+                continue
+            
+            # Calculate HFI
+            hfi_result = get_hfi(t, d, p, u, v)
+            
+            # Convert temperature from K to F
+            temp_f = (t - 273.15) * 9/5 + 32
+            
+            # Calculate wind speed in mph
+            wind_speed_mph = ((u**2 + v**2)**0.5) * 2.23694
+            
+            # Update summary data
+            high_temp_f = max(high_temp_f, temp_f)
+            total_wind_mph += wind_speed_mph
+            total_hfi += hfi_result
+            valid_intervals += 1
+        
+        # Check if we have any valid data
+        if valid_intervals == 0:
+            return jsonify({
+                'error': 'No valid forecast data found for the specified geohash',
+                'geohash': geohash
+            }), 404
+        
+        # Calculate averages
+        avg_wind_mph = total_wind_mph / valid_intervals
+        avg_hfi = total_hfi / valid_intervals
+        
+        # Return summary data
+        return jsonify({
+            'geohash': geohash,
+            'high_temperature_f': round(high_temp_f, 1),
+            'average_wind_mph': round(avg_wind_mph, 1),
+            'average_hfi': round(avg_hfi, 2),
+            'intervals_analyzed': valid_intervals
+        })
+    
+    except Exception as e:
+        app.logger.error(f"Error processing Hair Forecast Index summary request: {str(e)}")
+        return jsonify({'error': 'Internal server error'}), 500
+
 @app.route('/wxapi/', methods=['GET'])
 def index():
     """Simple index route to verify the API is running."""
