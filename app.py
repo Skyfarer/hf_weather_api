@@ -200,7 +200,7 @@ def get_forecast():
         app.logger.error(f"Error retrieving forecast data: {str(e)}")
         return jsonify({'error': 'Internal server error'}), 500
 
-@app.route('/wxapi/hfi', methods=['GET'])
+@app.route('/wxapi/hfi-detail', methods=['GET'])
 def calculate_hfi():
     """
     Calculate Hair Forecast Index (HFI) using forecast data for 8 intervals.
