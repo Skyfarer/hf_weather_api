@@ -354,7 +354,7 @@ def calculate_hfi():
 @app.route('/wxapi/hfi-summary', methods=['GET'])
 def hfi_summary():
     """
-    Calculate summary Hair Forecast Index (HFI) data across all intervals.
+    Calculate summary Hair Forecast Index (HFI) data across 4 intervals (24 hours).
     
     Query parameters:
     - geohash: Geohash location identifier (required)
@@ -387,14 +387,14 @@ def hfi_summary():
         if first_forecast_hour >= 24:
             first_forecast_hour = 24
         
-        # Generate 8 intervals, each 6 hours apart
+        # Generate 4 intervals (24 hours), each 6 hours apart
         intervals = []
-        for i in range(8):
+        for i in range(4):
             interval_hours = first_forecast_hour + (i * 6)
             interval_str = f"{interval_hours}h"
             intervals.append(interval_str)
         
-        app.logger.info(f"Using intervals: {intervals} for summary calculation")
+        app.logger.info(f"Using intervals: {intervals} for 24-hour summary calculation")
         
         # Variables to track summary data
         high_temp_f = float('-inf')
