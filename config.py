@@ -5,7 +5,5 @@ class Config:
     DEBUG = True
     PORT = 5000
     
-    # Valkey configuration
-    VALKEY_HOST = 'valkey'
-    VALKEY_PORT = 6379
-    VALKEY_PASSWORD = None
+    # Forecast grid file written by the ingest job
+    GRID_PATH = os.environ.get('HF_GRID_PATH', '/data/forecast.grid')
